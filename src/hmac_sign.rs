@@ -16,8 +16,6 @@ pub struct HmacResult {
 pub fn hmac_with_password(data: String, password: Password, options: KeyOptions) -> HmacResult {
     let GeneratedKey { key, salt, iv: _ } = generate_key(password, options);
 
-    println!("hmac salt sha256 {:?}", salt);
-
     let mut mac = HmacSha256::new_from_slice(&key.as_slice()).unwrap();
     mac.update(data.as_bytes());
     let result = mac.finalize();
