@@ -21,6 +21,7 @@ pub mod key;
 pub mod options;
 pub mod password;
 
+/// Creates sealed string from given options.
 fn seal<U>(data: String, password: U, options: SealOptions) -> Result<String, HapiIronOxideError>
 where
     U: SpecificPasswordInit,
@@ -87,7 +88,7 @@ where
     Ok(sealed)
 }
 
-/// Unseal the sealed string back into the original string
+/// Unseal the sealed string back into the original string.
 pub fn unseal<U>(
     sealed: String,
     password: U,

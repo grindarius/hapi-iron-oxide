@@ -1,4 +1,3 @@
-use generic_array::{ArrayLength, GenericArray};
 use pbkdf2::pbkdf2_hmac_array;
 use rand::{thread_rng, RngCore};
 use sha1::Sha1;
