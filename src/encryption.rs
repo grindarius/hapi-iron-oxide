@@ -1,5 +1,6 @@
 use crate::{
     algorithm::Algorithm,
+    errors::HapiIronOxideError,
     key::{self, GeneratedKey, KeyOptions},
     password::SpecificPassword,
 };
@@ -10,8 +11,11 @@ use aes::{
 use cbc::cipher::block_padding::Pkcs7;
 use ctr::cipher::{BlockEncryptMut, KeyIvInit};
 
+/// Struct storing the encrypted data from the [`encrypt`] function.
 pub struct EncryptedData {
+    /// Encrypted vector.
     pub encrypted: Vec<u8>,
+    /// Key used to encrypt the data.
     pub key: GeneratedKey,
 }
 
@@ -20,10 +24,15 @@ type Aes256CbcDec = cbc::Decryptor<Aes256>;
 
 type Aes128Ctr = ctr::Ctr64LE<Aes128>;
 
-pub fn encrypt(data: String, password: SpecificPassword, options: KeyOptions) -> EncryptedData {
-    let key = key::generate_key(password.encryption, options.clone());
+/// Encrypts the given data into ciphered text string.
+pub fn encrypt(
+    data: String,
+    password: SpecificPassword,
+    options: KeyOptions,
+) -> Result<EncryptedData, HapiIronOxideError> {
+    let key = key::generate_key(password.encryption, options.clone())?;
 
-    let encrypted_data = match options.algorithm {
+    let encrypted_data: Vec<u8> = match options.algorithm {
         Algorithm::Aes256Cbc => {
             let ciphered_text = Aes256CbcEnc::new(key.key.as_slice().into(), &key.iv.into())
                 .encrypt_padded_vec_mut::<Pkcs7>(data.as_bytes());
@@ -38,43 +47,43 @@ pub fn encrypt(data: String, password: SpecificPassword, options: KeyOptions) ->
 
             buf
         }
-        _ => {
-            panic!("invalid encrytion algorithm");
-        }
+        what => return Err(HapiIronOxideError::InvalidEncryptionAlgorithm(what.name())),
     };
 
-    EncryptedData {
+    Ok(EncryptedData {
         key,
         encrypted: encrypted_data,
-    }
+    })
 }
 
-pub fn decrypt(data: Vec<u8>, password: SpecificPassword, options: KeyOptions) -> Vec<u8> {
-    let key = key::generate_key(password.encryption, options.clone());
+/// Decrypts the ciphered bytes to plaintext bytes.
+pub fn decrypt(
+    data: Vec<u8>,
+    password: SpecificPassword,
+    options: KeyOptions,
+) -> Result<Vec<u8>, HapiIronOxideError> {
+    let key = key::generate_key(password.encryption, options.clone())?;
 
     let decrypted_data = match options.algorithm {
         Algorithm::Aes256Cbc => {
             let plaintext = Aes256CbcDec::new(key.key.as_slice().into(), &key.iv.into())
                 .decrypt_padded_vec_mut::<Pkcs7>(&data)
-                .unwrap();
+                .map_err(|_| HapiIronOxideError::UnpadError)?;
 
             plaintext
         }
         Algorithm::Aes128Ctr => {
-            let mut buf: Vec<u8> = Vec::from_iter(data.iter().cloned());
-
+            let mut plaintext_buf: Vec<u8> = Vec::from_iter(data.iter().cloned());
             let mut cipher = Aes128Ctr::new(key.key.as_slice().into(), &key.iv.into());
 
-            for chunk in buf.chunks_mut(3) {
+            for chunk in plaintext_buf.chunks_mut(3) {
                 cipher.apply_keystream(chunk);
             }
 
-            buf
+            plaintext_buf
         }
-        _ => {
-            panic!("invalid decryption algorithm");
-        }
+        what => return Err(HapiIronOxideError::InvalidDecryptionAlgorithm(what.name())),
     };
 
-    decrypted_data
+    Ok(decrypted_data)
 }
