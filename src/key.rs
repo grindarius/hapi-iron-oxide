@@ -1,8 +1,11 @@
+use generic_array::{ArrayLength, GenericArray};
 use pbkdf2::pbkdf2_hmac_array;
 use rand::{thread_rng, RngCore};
 use sha1::Sha1;
 
-use crate::{algorithm::Algorithm, password::Password};
+use crate::{
+    algorithm::Algorithm, constants::IV_SIZE, errors::HapiIronOxideError, password::Password,
+};
 
 /// Options to generate key.
 #[derive(Clone, Debug)]
@@ -30,25 +33,36 @@ pub struct GeneratedKey {
 }
 
 /// Generates a set of key, salt, and iv that will be used for further encryption.
-pub fn generate_key(password: Password, options: KeyOptions) -> GeneratedKey {
+pub fn generate_key(
+    password: Password,
+    options: KeyOptions,
+) -> Result<GeneratedKey, HapiIronOxideError> {
     let mut rng = thread_rng();
 
     // Put the iv from input into the slice if there's a given iv, otherwise generate new one.
-    // The iv used in the library is always going to be 16
-    let mut iv = if let Some(ref given_iv) = options.iv {
-        let mut iv_array: [u8; 16] = [0; 16];
-        iv_array[..given_iv.len()].copy_from_slice(given_iv.as_slice());
-        iv_array
-    } else {
-        let mut iv_array: [u8; 16] = [0; 16];
-        rng.fill_bytes(&mut iv_array);
-        iv_array
+    // The iv used in the library is always going to be 16.
+    let mut iv = match options.iv {
+        Some(ref given_iv) => {
+            let mut iv_array: [u8; 16] = [0; 16];
+
+            if given_iv.len() != IV_SIZE {
+                return Err(HapiIronOxideError::InvalidIVSize);
+            }
+
+            iv_array[..given_iv.len()].copy_from_slice(given_iv.as_slice());
+            iv_array
+        }
+        None => {
+            let mut iv_array: [u8; 16] = [0; 16];
+            rng.fill_bytes(&mut iv_array);
+            iv_array
+        }
     };
 
     match password {
         Password::String(password_string) => {
             if password_string.len() < options.minimum_password_length.try_into().unwrap() {
-                panic!("password length too short");
+                return Err(HapiIronOxideError::PasswordTooShort);
             }
 
             let salt_string: String = options.salt.unwrap_or_else(|| {
@@ -63,7 +77,7 @@ pub fn generate_key(password: Password, options: KeyOptions) -> GeneratedKey {
                 options.iterations.try_into().unwrap(),
             );
 
-            GeneratedKey {
+            Ok(GeneratedKey {
                 key: dk.to_vec(),
                 salt: Some(salt_string),
                 iv: match options.iv {
@@ -76,14 +90,14 @@ pub fn generate_key(password: Password, options: KeyOptions) -> GeneratedKey {
                         iv
                     }
                 },
-            }
+            })
         }
         Password::U8(password_vector) => {
             if password_vector.len() < options.minimum_password_length.try_into().unwrap() {
-                panic!("password length not match");
+                return Err(HapiIronOxideError::PasswordTooShort);
             }
 
-            GeneratedKey {
+            Ok(GeneratedKey {
                 key: password_vector,
                 salt: None,
                 iv: match options.iv {
@@ -96,7 +110,7 @@ pub fn generate_key(password: Password, options: KeyOptions) -> GeneratedKey {
                         iv
                     }
                 },
-            }
+            })
         }
     }
 }
@@ -135,7 +149,7 @@ mod tests {
             iv: Some(AES256CBC_GENERATED_IV.to_vec()),
         };
 
-        let key = generate_key(Password::String(DECRYPTED_PASSWORD.to_string()), options);
+        let key = generate_key(Password::String(DECRYPTED_PASSWORD.to_string()), options).unwrap();
 
         assert_eq!(key.salt, Some(AES256CBC_GENERATED_SALT.to_string()));
     }
