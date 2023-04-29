@@ -6,7 +6,6 @@ use hmac_sign::hmac_with_password;
 use key::KeyOptions;
 use options::SealOptions;
 use password::SpecificPasswordInit;
-use serde::{de::DeserializeOwned, Serialize};
 use time::Duration;
 
 use crate::base64_engine::ENGINE;
@@ -21,16 +20,14 @@ pub mod key;
 pub mod options;
 pub mod password;
 
-fn seal<T, U>(data: T, password: U, options: SealOptions) -> String
+fn seal<U>(data: String, password: U, options: SealOptions) -> String
 where
-    T: Serialize,
     U: SpecificPasswordInit,
 {
-    let data_string = serde_json::to_string(&data).unwrap();
     let normalized_password = password.normalize();
 
     let encrypted = encryption::encrypt(
-        data_string,
+        data,
         normalized_password.clone(),
         KeyOptions {
             algorithm: options.encryption.algorithm,
@@ -89,9 +86,9 @@ where
     sealed
 }
 
-pub fn unseal<T, U>(sealed: String, password: U, options: SealOptions) -> T
+/// Unseal the sealed string back into the original string
+pub fn unseal<U>(sealed: String, password: U, options: SealOptions) -> String
 where
-    T: DeserializeOwned,
     U: SpecificPasswordInit,
 {
     let now = time::OffsetDateTime::now_utc() + time::Duration::new(options.local_offset.into(), 0);
@@ -161,42 +158,31 @@ where
 
     let decrypted_vector = decrypt(decrypted_value, normalized_password, decrypt_options);
 
-    let json: T = serde_json::from_slice(decrypted_vector.as_slice()).unwrap();
-
-    json
+    String::from_utf8(decrypted_vector).unwrap()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Serialize, Deserialize, Clone)]
-    struct Diss {
-        dis: String,
-    }
 
     const PASSWORD: &'static str =
         "passwordpasswordpasswordpasswordpasswordpasswordpasswordpassword";
+    const DATA_STRING: &'static str = "{\"dis\":\"eh\"}";
+
+    #[test]
+    fn test_seal_unseal() {
+        let sealed = seal(DATA_STRING.to_string(), PASSWORD, Default::default());
+        let unsealed = unseal(sealed, PASSWORD, Default::default());
+
+        assert_eq!(unsealed, DATA_STRING);
+    }
 
     #[test]
     fn test_unseal_from_node() {
         let s = "Fe26.2**79c5378388cbe4f2c71d3ea08b562f7b26bc13c029843549bb3c155e12dc86d7*KuWCSG7MB23J8sPKmUj6Hg*AdqzRL9iLYGku3uG903Pww**a268d5bb817dc86e60e413ed25ddf833962d249c806f72019420c2a0341751a3*uh1HrJMhK4x4WhAu8pnjpNabnaDzQbCzhK31YDVsGxQ";
 
-        let u: Diss = unseal::<Diss, &str>(s.to_string(), PASSWORD, Default::default());
+        let u = unseal(s.to_string(), PASSWORD, Default::default());
 
-        assert_eq!(u.dis, "eh".to_string());
-    }
-
-    #[test]
-    fn test_seal_unseal() {
-        let data: Diss = Diss {
-            dis: "eh".to_string(),
-        };
-
-        let sealed = seal(Clone::clone(&data), PASSWORD, Default::default());
-        let unsealed: Diss = unseal(sealed, PASSWORD, Default::default());
-
-        assert_eq!(unsealed.dis, data.dis);
+        assert_eq!(u, "{\"dis\":\"eh\"}".to_string());
     }
 }
