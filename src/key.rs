@@ -1,5 +1,5 @@
 use pbkdf2::pbkdf2_hmac_array;
-use rand::{thread_rng, Rng, RngCore};
+use rand::{thread_rng, RngCore};
 use sha1::Sha1;
 
 use crate::{algorithm::Algorithm, password::Password};
@@ -13,14 +13,15 @@ pub struct KeyOptions {
     pub iterations: i32,
     /// Minimum password length.
     pub minimum_password_length: i32,
-    /// Salt string to use.
+    /// Salt string to use. Will generate one if this option is [`None`]
     pub salt: Option<String>,
-    /// IV to use. Will generate one if this array is empty.
+    /// IV to use. Will generate one if this option is [`None`]
     pub iv: Option<Vec<u8>>,
 }
 
 #[derive(Debug)]
 pub struct GeneratedKey {
+    /// Returned key
     pub key: Vec<u8>,
     /// Returned salt. If there's a given salt. The salt will be used to generate the key,
     /// otherwise generate new salt.
@@ -32,26 +33,29 @@ pub struct GeneratedKey {
 pub fn generate_key(password: Password, options: KeyOptions) -> GeneratedKey {
     let mut rng = thread_rng();
 
-    println!("key options {:?}", options);
-
-    let mut iv = [0u8; 16];
-
     // Put the iv from input into the slice if there's a given iv, otherwise generate new one.
-    if let Some(ref given_iv) = options.iv {
-        iv[..given_iv.len()].copy_from_slice(given_iv.as_slice());
+    // The iv used in the library is always going to be 16
+    let mut iv = if let Some(ref given_iv) = options.iv {
+        let mut iv_array: [u8; 16] = [0; 16];
+        iv_array[..given_iv.len()].copy_from_slice(given_iv.as_slice());
+        iv_array
     } else {
-        rng.fill_bytes(&mut iv);
-    }
+        let mut iv_array: [u8; 16] = [0; 16];
+        rng.fill_bytes(&mut iv_array);
+        iv_array
+    };
 
     match password {
         Password::String(password_string) => {
+            if password_string.len() < options.minimum_password_length.try_into().unwrap() {
+                panic!("password length too short");
+            }
+
             let salt_string: String = options.salt.unwrap_or_else(|| {
                 let mut salt: [u8; 32] = [0; 32];
                 rng.fill_bytes(&mut salt);
                 hex::encode(salt)
             });
-
-            println!("salt string {:?}", salt_string);
 
             let dk = pbkdf2_hmac_array::<Sha1, 32>(
                 password_string.as_bytes(),
@@ -74,20 +78,26 @@ pub fn generate_key(password: Password, options: KeyOptions) -> GeneratedKey {
                 },
             }
         }
-        Password::U8(password_vector) => GeneratedKey {
-            key: password_vector,
-            salt: None,
-            iv: match options.iv {
-                Some(given_iv) => {
-                    iv[..given_iv.len()].copy_from_slice(&given_iv[..]);
-                    iv
-                }
-                None => {
-                    rng.fill_bytes(&mut iv);
-                    iv
-                }
-            },
-        },
+        Password::U8(password_vector) => {
+            if password_vector.len() < options.minimum_password_length.try_into().unwrap() {
+                panic!("password length not match");
+            }
+
+            GeneratedKey {
+                key: password_vector,
+                salt: None,
+                iv: match options.iv {
+                    Some(given_iv) => {
+                        iv[..given_iv.len()].copy_from_slice(&given_iv[..]);
+                        iv
+                    }
+                    None => {
+                        rng.fill_bytes(&mut iv);
+                        iv
+                    }
+                },
+            }
+        }
     }
 }
 
