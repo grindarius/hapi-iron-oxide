@@ -198,6 +198,7 @@ dependencies = [
  "cbc",
  "constant_time_eq",
  "ctr",
+ "generic-array",
  "hex",
  "pbkdf2",
  "rand",
