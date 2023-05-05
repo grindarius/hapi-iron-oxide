@@ -10,7 +10,7 @@ use aes::{
 };
 use cbc::cipher::block_padding::Pkcs7;
 use ctr::cipher::{BlockEncryptMut, KeyIvInit};
-use generic_array::{typenum::U32, ArrayLength};
+use generic_array::ArrayLength;
 
 /// Struct storing the encrypted data from the [`encrypt`] function.
 pub struct EncryptedData {

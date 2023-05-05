@@ -53,18 +53,19 @@ pub mod password;
 pub use generic_array::typenum;
 
 /// Creates sealed string from given options.
-pub fn seal<N, U>(
+pub fn seal<E, I, U>(
     data: String,
     password: U,
     options: SealOptions,
 ) -> Result<String, HapiIronOxideError>
 where
-    N: ArrayLength<u8>,
+    E: ArrayLength<u8>,
+    I: ArrayLength<u8>,
     U: SpecificPasswordInit,
 {
     let normalized_password = password.normalize()?;
 
-    let encrypted = encryption::encrypt::<N>(
+    let encrypted = encryption::encrypt::<E>(
         data,
         normalized_password.clone(),
         KeyOptions {
@@ -108,7 +109,7 @@ where
         iv: None,
     };
 
-    let result = seal_hmac_with_password::<N>(
+    let result = seal_hmac_with_password::<I>(
         mac_base_string.clone(),
         Clone::clone(&normalized_password.integrity),
         mac_options,
@@ -206,7 +207,7 @@ where
 mod tests {
     use super::*;
 
-    use generic_array::typenum::U32;
+    use generic_array::typenum::{U128, U32, U64};
 
     const PASSWORD: &'static str =
         "passwordpasswordpasswordpasswordpasswordpasswordpasswordpassword";
@@ -214,7 +215,8 @@ mod tests {
 
     #[test]
     fn test_seal_unseal() {
-        let sealed = seal::<U32, _>(DATA_STRING.to_string(), PASSWORD, Default::default()).unwrap();
+        let sealed =
+            seal::<U32, U32, _>(DATA_STRING.to_string(), PASSWORD, Default::default()).unwrap();
         let unsealed = unseal(sealed, PASSWORD, Default::default()).unwrap();
 
         assert_eq!(unsealed, DATA_STRING.to_string());
@@ -230,12 +232,22 @@ mod tests {
     }
 
     #[test]
+    fn test_seal_custom_salt_size() {
+        let sealed =
+            seal::<U64, U128, _>(DATA_STRING.to_string(), PASSWORD, Default::default()).unwrap();
+
+        let unsealed = unseal(sealed, PASSWORD, Default::default()).unwrap();
+
+        assert_eq!(unsealed, DATA_STRING.to_string());
+    }
+
+    #[test]
     #[should_panic]
     fn test_seal_unseal_invalid_key_size_in_vec_u8() {
         let p = b"passwordpasswordpasswordpasswordpasswordpasswordpasswordpassword";
         let password_as_bytes = p.to_vec();
 
-        let sealed = seal::<U32, _>(
+        let sealed = seal::<U32, U32, _>(
             DATA_STRING.to_string(),
             password_as_bytes.clone(),
             Default::default(),
