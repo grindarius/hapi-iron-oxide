@@ -7,7 +7,7 @@ use crate::errors::HapiIronOxideError;
 /// The original implementation of [brc-dd/iron-webcrypto](https://github.com/brc-dd/iron-webcrypto) uses any incoming password in vector form as
 /// the key directly without any salt. But when the password is in [`String`] format, we will
 /// generate salt and create the key using `pbkdf2` algorithm.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Password {
     U8(Vec<u8>),
     String(String),
@@ -65,12 +65,59 @@ pub trait SpecificPasswordInit {
     ///
     /// If the function is given a [`HashMap`], it will try to find the password using the given
     /// index, otherwise it will find the password using the `default` as key.
+    ///
+    /// ```
+    /// use std::collections::HashMap;
+    ///
+    /// use hapi_iron_oxide::password::{Password, SpecificPassword, SpecificPasswordInit};
+    ///
+    /// let password_hashmap: HashMap<String, SpecificPassword> =
+    ///     HashMap::from([(
+    ///         "default".to_string(),
+    ///         SpecificPassword {
+    ///             id: "".to_string(),
+    ///             encryption: Password::String("raw_encryption_password_here".to_string()),
+    ///             integrity: Password::String("raw_integrity_password_here".to_string()),
+    ///         }
+    ///     )]);
+    /// let specific: SpecificPassword = password_hashmap.normalize_unseal(None).unwrap();
+    ///
+    /// assert_eq!(specific.id, "".to_string());
+    /// assert_eq!(specific.encryption, Password::String("raw_encryption_password_here".to_string()));
+    /// assert_eq!(specific.integrity, Password::String("raw_integrity_password_here".to_string()));
+    /// ```
     fn normalize_unseal(&self, _idx: Option<&str>) -> Result<SpecificPassword, HapiIronOxideError> {
         Err(HapiIronOxideError::NormalizeUnsealUnimplemented)
     }
 }
 
 impl SpecificPasswordInit for &[u8] {
+    fn normalize(&self) -> Result<SpecificPassword, HapiIronOxideError> {
+        if self.is_empty() {
+            return Err(HapiIronOxideError::PasswordRequired);
+        }
+
+        Ok(SpecificPassword {
+            id: "".to_string(),
+            encryption: Password::U8(self.to_vec()),
+            integrity: Password::U8(self.to_vec()),
+        })
+    }
+
+    fn normalize_unseal(&self, _idx: Option<&str>) -> Result<SpecificPassword, HapiIronOxideError> {
+        if self.is_empty() {
+            return Err(HapiIronOxideError::PasswordRequired);
+        }
+
+        Ok(SpecificPassword {
+            id: "".to_string(),
+            encryption: Password::U8(self.to_vec()),
+            integrity: Password::U8(self.to_vec()),
+        })
+    }
+}
+
+impl SpecificPasswordInit for Vec<u8> {
     fn normalize(&self) -> Result<SpecificPassword, HapiIronOxideError> {
         if self.is_empty() {
             return Err(HapiIronOxideError::PasswordRequired);
