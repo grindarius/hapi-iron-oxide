@@ -10,7 +10,6 @@ use aes::{
 };
 use cbc::cipher::block_padding::Pkcs7;
 use ctr::cipher::{BlockEncryptMut, KeyIvInit};
-use generic_array::ArrayLength;
 
 /// Struct storing the encrypted data from the [`encrypt`] function.
 pub struct EncryptedData {
@@ -26,14 +25,11 @@ type Aes256CbcDec = cbc::Decryptor<Aes256>;
 type Aes128Ctr = ctr::Ctr64LE<Aes128>;
 
 /// Encrypts the given data into ciphered text string.
-pub fn encrypt<N>(
+pub fn encrypt<const N: usize>(
     data: String,
     password: SpecificPassword,
     options: KeyOptions,
-) -> Result<EncryptedData, HapiIronOxideError>
-where
-    N: ArrayLength<u8>,
-{
+) -> Result<EncryptedData, HapiIronOxideError> {
     let key = key::generate_key::<N>(password.encryption, options.clone())?;
 
     let encrypted_data: Vec<u8> = match options.algorithm {

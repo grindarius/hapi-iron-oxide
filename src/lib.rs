@@ -9,12 +9,11 @@
 //! ### Usage
 //! ```
 //! use hapi_iron_oxide::{seal, unseal};
-//! use hapi_iron_oxide::typenum;
 //!
 //! let password = "passwordpasswordpasswordpasswordpasswordpasswordpasswordpassword";
 //! let data = "Hello World Please";
 //!
-//! let sealed = seal::<typenum::U32, typenum::U32, _>(data.to_string(), password, Default::default()).unwrap();
+//! let sealed = seal::<32, 32, _>(data.to_string(), password, Default::default()).unwrap();
 //! let unsealed = unseal(sealed, password.clone(), Default::default());
 //!
 //! assert_eq!(unsealed.unwrap(), data.to_string());
@@ -31,7 +30,6 @@ use constant_time_eq::constant_time_eq;
 use constants::MAC_PREFIX;
 use encryption::decrypt;
 use errors::HapiIronOxideError;
-use generic_array::ArrayLength;
 use hmac_sign::{seal_hmac_with_password, unseal_hmac_with_password};
 use key::KeyOptions;
 use options::SealOptions;
@@ -50,17 +48,13 @@ pub mod key;
 pub mod options;
 pub mod password;
 
-pub use generic_array::typenum;
-
 /// Creates sealed string from given options.
-pub fn seal<E, I, U>(
+pub fn seal<const E: usize, const I: usize, U>(
     data: String,
     password: U,
     options: SealOptions,
 ) -> Result<String, HapiIronOxideError>
 where
-    E: ArrayLength<u8>,
-    I: ArrayLength<u8>,
     U: SpecificPasswordInit,
 {
     let normalized_password = password.normalize()?;
@@ -207,8 +201,6 @@ where
 mod tests {
     use super::*;
 
-    use generic_array::typenum::{U128, U32, U64};
-
     const PASSWORD: &'static str =
         "passwordpasswordpasswordpasswordpasswordpasswordpasswordpassword";
     const DATA_STRING: &'static str = "{\"dis\":\"eh\"}";
@@ -216,7 +208,7 @@ mod tests {
     #[test]
     fn test_seal_unseal() {
         let sealed =
-            seal::<U32, U32, _>(DATA_STRING.to_string(), PASSWORD, Default::default()).unwrap();
+            seal::<32, 32, _>(DATA_STRING.to_string(), PASSWORD, Default::default()).unwrap();
         let unsealed = unseal(sealed, PASSWORD, Default::default()).unwrap();
 
         assert_eq!(unsealed, DATA_STRING.to_string());
@@ -234,7 +226,7 @@ mod tests {
     #[test]
     fn test_seal_custom_salt_size() {
         let sealed =
-            seal::<U64, U128, _>(DATA_STRING.to_string(), PASSWORD, Default::default()).unwrap();
+            seal::<64, 128, _>(DATA_STRING.to_string(), PASSWORD, Default::default()).unwrap();
 
         let unsealed = unseal(sealed, PASSWORD, Default::default()).unwrap();
 
@@ -247,7 +239,7 @@ mod tests {
         let p = b"passwordpasswordpasswordpasswordpasswordpasswordpasswordpassword";
         let password_as_bytes = p.to_vec();
 
-        let sealed = seal::<U32, U32, _>(
+        let sealed = seal::<32, 32, _>(
             DATA_STRING.to_string(),
             password_as_bytes.clone(),
             Default::default(),

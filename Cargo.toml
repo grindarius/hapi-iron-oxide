@@ -9,7 +9,6 @@ base64 = "0.21"
 cbc = { version = "0.1.2", features = ["std"] }
 constant_time_eq = "0.2"
 ctr = { version = "0.9", features = ["std"] }
-generic-array = { version = "0.14.7", features = ["more_lengths"] }
 hex = "0.4"
 pbkdf2 = { version = "0.12", features = ["parallel"] }
 rand = "0.8"

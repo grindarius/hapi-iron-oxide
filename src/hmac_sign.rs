@@ -1,4 +1,3 @@
-use generic_array::{typenum::U32, ArrayLength};
 use pbkdf2::hmac::{Hmac, Mac};
 use sha2::Sha256;
 
@@ -31,14 +30,11 @@ fn hmac_with_password(data: String, key: Vec<u8>, salt: Option<String>) -> HmacR
 }
 
 /// Hashes the given data into HMAC digest.
-pub fn seal_hmac_with_password<N>(
+pub fn seal_hmac_with_password<const N: usize>(
     data: String,
     password: Password,
     options: KeyOptions,
-) -> Result<HmacResult, HapiIronOxideError>
-where
-    N: ArrayLength<u8>,
-{
+) -> Result<HmacResult, HapiIronOxideError> {
     let GeneratedKey { key, salt, iv: _ } = generate_key::<N>(password, options)?;
     let result = hmac_with_password(data, key, salt);
     Ok(result)

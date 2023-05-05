@@ -324,7 +324,6 @@ dependencies = [
  "constant_time_eq",
  "criterion",
  "ctr",
- "generic-array",
  "hex",
  "pbkdf2",
  "rand",

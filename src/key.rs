@@ -1,4 +1,3 @@
-use generic_array::{typenum::U32, ArrayLength, GenericArray};
 use pbkdf2::pbkdf2_hmac_array;
 use rand::{thread_rng, RngCore};
 use sha1::Sha1;
@@ -33,20 +32,17 @@ pub struct GeneratedKey {
 }
 
 /// Generates a set of key, salt, and iv that will be used for further encryption.
-pub fn generate_key<N>(
+pub fn generate_key<const N: usize>(
     password: Password,
     options: KeyOptions,
-) -> Result<GeneratedKey, HapiIronOxideError>
-where
-    N: ArrayLength<u8>,
-{
+) -> Result<GeneratedKey, HapiIronOxideError> {
     let mut rng = thread_rng();
 
     // Put the iv from input into the slice if there's a given iv, otherwise generate new one.
     // The iv used in the library is always going to be 16.
     let mut iv = match options.iv {
         Some(ref given_iv) => {
-            let mut iv_array: [u8; 16] = [0; 16];
+            let mut iv_array: [u8; IV_SIZE] = [0; IV_SIZE];
 
             if given_iv.len() != IV_SIZE {
                 return Err(HapiIronOxideError::InvalidIVSize);
@@ -69,7 +65,7 @@ where
             }
 
             let salt_string: String = options.salt.unwrap_or_else(|| {
-                let mut salt: GenericArray<u8, N> = GenericArray::default();
+                let mut salt: [u8; N] = [0; N];
                 rng.fill_bytes(&mut salt);
                 hex::encode(salt)
             });
@@ -125,13 +121,11 @@ pub fn generate_unseal_key(
     password: Password,
     options: KeyOptions,
 ) -> Result<GeneratedKey, HapiIronOxideError> {
-    generate_key::<U32>(password, options)
+    generate_key::<32>(password, options)
 }
 
 #[cfg(test)]
 mod tests {
-    use generic_array::typenum::U32;
-
     use super::*;
 
     const DECRYPTED_PASSWORD: &'static str =
@@ -165,7 +159,7 @@ mod tests {
         };
 
         let key =
-            generate_key::<U32>(Password::String(DECRYPTED_PASSWORD.to_string()), options).unwrap();
+            generate_key::<32>(Password::String(DECRYPTED_PASSWORD.to_string()), options).unwrap();
 
         assert_eq!(key.salt, Some(AES256CBC_GENERATED_SALT.to_string()));
     }
