@@ -11,7 +11,7 @@ pub struct EncryptionOptions {
 pub struct SealOptions {
     pub encryption: EncryptionOptions,
     pub integrity: EncryptionOptions,
-    pub ttl: u64,
+    pub ttl: i64,
     pub timestamp_skew: u32,
     pub local_offset: i32,
 }
@@ -19,7 +19,7 @@ pub struct SealOptions {
 pub struct SealOptionsBuilder {
     encryption: EncryptionOptions,
     integrity: EncryptionOptions,
-    ttl: u64,
+    ttl: i64,
     timestamp_skew: u32,
     local_offset: i32,
 }
@@ -79,7 +79,7 @@ impl SealOptionsBuilder {
         self
     }
 
-    pub fn ttl(mut self, ttl: u64) -> Self {
+    pub fn ttl(mut self, ttl: i64) -> Self {
         self.ttl = ttl;
         self
     }
