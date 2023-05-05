@@ -1,9 +1,10 @@
+use generic_array::{typenum::U32, ArrayLength};
 use pbkdf2::hmac::{Hmac, Mac};
 use sha2::Sha256;
 
 use crate::{
     errors::HapiIronOxideError,
-    key::{generate_key, GeneratedKey, KeyOptions},
+    key::{generate_key, generate_unseal_key, GeneratedKey, KeyOptions},
     password::Password,
 };
 
@@ -17,24 +18,38 @@ pub struct HmacResult {
     pub salt: Option<String>,
 }
 
+fn hmac_with_password(data: String, key: Vec<u8>, salt: Option<String>) -> HmacResult {
+    let mut mac =
+        HmacSha256::new_from_slice(&key.as_slice()).expect("HMAC can take key of any size");
+    mac.update(data.as_bytes());
+    let result = mac.finalize();
+
+    HmacResult {
+        digest: result.into_bytes().to_vec(),
+        salt,
+    }
+}
+
 /// Hashes the given data into HMAC digest.
-pub fn hmac_with_password<T>(
-    data: T,
+pub fn seal_hmac_with_password<N>(
+    data: String,
     password: Password,
     options: KeyOptions,
 ) -> Result<HmacResult, HapiIronOxideError>
 where
-    T: AsRef<str>,
+    N: ArrayLength<u8>,
 {
-    let GeneratedKey { key, salt, iv: _ } = generate_key(password, options)?;
+    let GeneratedKey { key, salt, iv: _ } = generate_key::<N>(password, options)?;
+    let result = hmac_with_password(data, key, salt);
+    Ok(result)
+}
 
-    let mut mac =
-        HmacSha256::new_from_slice(&key.as_slice()).expect("HMAC can take key of any size");
-    mac.update(data.as_ref().as_bytes());
-    let result = mac.finalize();
-
-    Ok(HmacResult {
-        digest: result.into_bytes().to_vec(),
-        salt,
-    })
+pub fn unseal_hmac_with_password(
+    data: String,
+    password: Password,
+    options: KeyOptions,
+) -> Result<HmacResult, HapiIronOxideError> {
+    let GeneratedKey { key, salt, iv: _ } = generate_unseal_key(password, options)?;
+    let result = hmac_with_password(data, key, salt);
+    Ok(result)
 }

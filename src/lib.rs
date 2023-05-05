@@ -3,7 +3,8 @@ use constant_time_eq::constant_time_eq;
 use constants::MAC_PREFIX;
 use encryption::decrypt;
 use errors::HapiIronOxideError;
-use hmac_sign::hmac_with_password;
+use generic_array::ArrayLength;
+use hmac_sign::{seal_hmac_with_password, unseal_hmac_with_password};
 use key::KeyOptions;
 use options::SealOptions;
 use password::SpecificPasswordInit;
@@ -21,14 +22,21 @@ pub mod key;
 pub mod options;
 pub mod password;
 
+pub use generic_array::typenum;
+
 /// Creates sealed string from given options.
-fn seal<U>(data: String, password: U, options: SealOptions) -> Result<String, HapiIronOxideError>
+pub fn seal<N, U>(
+    data: String,
+    password: U,
+    options: SealOptions,
+) -> Result<String, HapiIronOxideError>
 where
+    N: ArrayLength<u8>,
     U: SpecificPasswordInit,
 {
     let normalized_password = password.normalize()?;
 
-    let encrypted = encryption::encrypt(
+    let encrypted = encryption::encrypt::<N>(
         data,
         normalized_password.clone(),
         KeyOptions {
@@ -72,7 +80,7 @@ where
         iv: None,
     };
 
-    let result = hmac_with_password(
+    let result = seal_hmac_with_password::<N>(
         mac_base_string.clone(),
         Clone::clone(&normalized_password.integrity),
         mac_options,
@@ -139,7 +147,7 @@ where
         iv: None,
     };
 
-    let result = hmac_with_password(
+    let result = unseal_hmac_with_password(
         mac_base_string,
         Clone::clone(&normalized_password.integrity),
         mac_options,
@@ -147,7 +155,7 @@ where
 
     if !constant_time_eq(
         result.digest.as_slice(),
-        ENGINE.decode(hmac_digest).unwrap().as_slice(),
+        ENGINE.decode(hmac_digest)?.as_slice(),
     ) {
         return Err(HapiIronOxideError::InvalidHmacValue);
     }
@@ -170,13 +178,15 @@ where
 mod tests {
     use super::*;
 
+    use generic_array::typenum::U32;
+
     const PASSWORD: &'static str =
         "passwordpasswordpasswordpasswordpasswordpasswordpasswordpassword";
     const DATA_STRING: &'static str = "{\"dis\":\"eh\"}";
 
     #[test]
     fn test_seal_unseal() {
-        let sealed = seal(DATA_STRING.to_string(), PASSWORD, Default::default()).unwrap();
+        let sealed = seal::<U32, _>(DATA_STRING.to_string(), PASSWORD, Default::default()).unwrap();
         let unsealed = unseal(sealed, PASSWORD, Default::default()).unwrap();
 
         assert_eq!(unsealed, DATA_STRING.to_string());
@@ -189,5 +199,22 @@ mod tests {
         let u = unseal(s.to_string(), PASSWORD, Default::default()).unwrap();
 
         assert_eq!(u, DATA_STRING.to_string());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_seal_unseal_invalid_key_size_in_vec_u8() {
+        let p = b"passwordpasswordpasswordpasswordpasswordpasswordpasswordpassword";
+        let password_as_bytes = p.to_vec();
+
+        let sealed = seal::<U32, _>(
+            DATA_STRING.to_string(),
+            password_as_bytes.clone(),
+            Default::default(),
+        )
+        .unwrap();
+        let unsealed = unseal(sealed, password_as_bytes, Default::default()).unwrap();
+
+        assert_eq!(unsealed, DATA_STRING.to_string());
     }
 }

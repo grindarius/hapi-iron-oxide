@@ -1,3 +1,4 @@
+use generic_array::{typenum::U32, ArrayLength, GenericArray};
 use pbkdf2::pbkdf2_hmac_array;
 use rand::{thread_rng, RngCore};
 use sha1::Sha1;
@@ -32,10 +33,13 @@ pub struct GeneratedKey {
 }
 
 /// Generates a set of key, salt, and iv that will be used for further encryption.
-pub fn generate_key(
+pub fn generate_key<N>(
     password: Password,
     options: KeyOptions,
-) -> Result<GeneratedKey, HapiIronOxideError> {
+) -> Result<GeneratedKey, HapiIronOxideError>
+where
+    N: ArrayLength<u8>,
+{
     let mut rng = thread_rng();
 
     // Put the iv from input into the slice if there's a given iv, otherwise generate new one.
@@ -52,7 +56,7 @@ pub fn generate_key(
             iv_array
         }
         None => {
-            let mut iv_array: [u8; 16] = [0; 16];
+            let mut iv_array: [u8; IV_SIZE] = [0; IV_SIZE];
             rng.fill_bytes(&mut iv_array);
             iv_array
         }
@@ -65,7 +69,7 @@ pub fn generate_key(
             }
 
             let salt_string: String = options.salt.unwrap_or_else(|| {
-                let mut salt: [u8; 32] = [0; 32];
+                let mut salt: GenericArray<u8, N> = GenericArray::default();
                 rng.fill_bytes(&mut salt);
                 hex::encode(salt)
             });
@@ -114,8 +118,20 @@ pub fn generate_key(
     }
 }
 
+/// Generates key upon call of [`unseal`] function. Since there will always be a salt string that
+/// comes in. That means the generic parameter can be of any value. Defaults as
+/// [`generic_array::typenum::U32`]
+pub fn generate_unseal_key(
+    password: Password,
+    options: KeyOptions,
+) -> Result<GeneratedKey, HapiIronOxideError> {
+    generate_key::<U32>(password, options)
+}
+
 #[cfg(test)]
 mod tests {
+    use generic_array::typenum::U32;
+
     use super::*;
 
     const DECRYPTED_PASSWORD: &'static str =
@@ -148,7 +164,8 @@ mod tests {
             iv: Some(AES256CBC_GENERATED_IV.to_vec()),
         };
 
-        let key = generate_key(Password::String(DECRYPTED_PASSWORD.to_string()), options).unwrap();
+        let key =
+            generate_key::<U32>(Password::String(DECRYPTED_PASSWORD.to_string()), options).unwrap();
 
         assert_eq!(key.salt, Some(AES256CBC_GENERATED_SALT.to_string()));
     }
