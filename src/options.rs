@@ -64,6 +64,12 @@ impl Default for SealOptions {
     }
 }
 
+impl SealOptions {
+    pub fn config(&self) -> &Self {
+        self
+    }
+}
+
 impl SealOptionsBuilder {
     pub fn new() -> Self {
         Self::default()

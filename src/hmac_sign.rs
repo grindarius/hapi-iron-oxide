@@ -2,6 +2,7 @@ use pbkdf2::hmac::{Hmac, Mac};
 use sha2::Sha256;
 
 use crate::{
+    algorithm::Algorithm,
     errors::HapiIronOxideError,
     key::{generate_key, generate_unseal_key, GeneratedKey, KeyOptions},
     password::Password,
@@ -35,9 +36,15 @@ pub fn seal_hmac_with_password<const N: usize>(
     password: Password,
     options: KeyOptions,
 ) -> Result<HmacResult, HapiIronOxideError> {
-    let GeneratedKey { key, salt, iv: _ } = generate_key::<N>(password, options)?;
-    let result = hmac_with_password(data, key, salt);
-    Ok(result)
+    let GeneratedKey { key, salt, iv: _ } = generate_key::<N>(password, &options)?;
+
+    match options.algorithm {
+        Algorithm::Sha256 => {
+            let result = hmac_with_password(data, key, salt);
+            return Ok(result);
+        }
+        what => return Err(HapiIronOxideError::InvalidHashAlgorithm(what.name())),
+    }
 }
 
 pub fn unseal_hmac_with_password(
@@ -45,7 +52,13 @@ pub fn unseal_hmac_with_password(
     password: Password,
     options: KeyOptions,
 ) -> Result<HmacResult, HapiIronOxideError> {
-    let GeneratedKey { key, salt, iv: _ } = generate_unseal_key(password, options)?;
-    let result = hmac_with_password(data, key, salt);
-    Ok(result)
+    let GeneratedKey { key, salt, iv: _ } = generate_unseal_key(password, &options)?;
+
+    match options.algorithm {
+        Algorithm::Sha256 => {
+            let result = hmac_with_password(data, key, salt);
+            return Ok(result);
+        }
+        what => return Err(HapiIronOxideError::InvalidHashAlgorithm(what.name())),
+    }
 }

@@ -1,10 +1,10 @@
 use std::num::ParseIntError;
 
-use base64::DecodeError;
+use base64::{DecodeError, DecodeSliceError};
 use thiserror::Error;
 use time::error::ComponentRange;
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, PartialEq)]
 pub enum HapiIronOxideError {
     #[error("password field is empty")]
     PasswordFieldEmpty,
@@ -24,6 +24,8 @@ pub enum HapiIronOxideError {
         "invalid decryption algorithm: {0}, the algorithm can only be AES-128-CTR or AES-256-CBC"
     )]
     InvalidDecryptionAlgorithm(String),
+    #[error("invalid hash algorithm: {0}, the algorithm can only be SHA-256")]
+    InvalidHashAlgorithm(String),
     #[error("invalid seal")]
     InvalidSeal,
     #[error("expired seal")]
@@ -48,6 +50,12 @@ pub enum HapiIronOxideError {
 
 impl From<DecodeError> for HapiIronOxideError {
     fn from(value: DecodeError) -> Self {
+        HapiIronOxideError::Base64DecodeError(value.to_string())
+    }
+}
+
+impl From<DecodeSliceError> for HapiIronOxideError {
+    fn from(value: DecodeSliceError) -> Self {
         HapiIronOxideError::Base64DecodeError(value.to_string())
     }
 }

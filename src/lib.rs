@@ -27,12 +27,11 @@
 
 use base64::Engine;
 use constant_time_eq::constant_time_eq;
-use constants::MAC_PREFIX;
+use constants::{IV_SIZE, MAC_PREFIX};
 use encryption::decrypt;
 use errors::HapiIronOxideError;
 use hmac_sign::{seal_hmac_with_password, unseal_hmac_with_password};
 use key::KeyOptions;
-use options::SealOptions;
 use password::SpecificPasswordInit;
 use time::Duration;
 
@@ -47,6 +46,8 @@ pub mod hmac_sign;
 pub mod key;
 pub mod options;
 pub mod password;
+
+pub use options::{SealOptions, SealOptionsBuilder};
 
 /// Creates sealed string from given options.
 pub fn seal<const E: usize, const I: usize, U>(
@@ -184,12 +185,17 @@ where
     }
 
     let decrypted_value = ENGINE.decode(encryption_value)?;
+
+    let mut iv: [u8; 16] = [0; 16];
+    // any invalid length causes a panic
+    ENGINE.decode_slice_unchecked(encryption_iv, &mut iv)?;
+
     let decrypt_options = KeyOptions {
         algorithm: options.encryption.algorithm,
         iterations: options.encryption.iterations,
         minimum_password_length: options.encryption.minimum_password_length,
         salt: Some(encryption_salt.to_string()),
-        iv: Some(ENGINE.decode(encryption_iv)?),
+        iv: Some(iv),
     };
 
     let decrypted_vector = decrypt(decrypted_value, normalized_password, decrypt_options)?;

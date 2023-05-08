@@ -18,7 +18,7 @@ pub struct KeyOptions {
     /// Salt string to use. Will generate one if this option is [`None`]
     pub salt: Option<String>,
     /// IV to use. Will generate one if this option is [`None`]
-    pub iv: Option<Vec<u8>>,
+    pub iv: Option<[u8; IV_SIZE]>,
 }
 
 #[derive(Debug)]
@@ -28,13 +28,13 @@ pub struct GeneratedKey {
     /// Returned salt. If there's a given salt. The salt will be used to generate the key,
     /// otherwise generate new salt.
     pub salt: Option<String>,
-    pub iv: [u8; 16],
+    pub iv: [u8; IV_SIZE],
 }
 
 /// Generates a set of key, salt, and iv that will be used for further encryption.
 pub fn generate_key<const N: usize>(
     password: Password,
-    options: KeyOptions,
+    options: &KeyOptions,
 ) -> Result<GeneratedKey, HapiIronOxideError> {
     let mut rng = thread_rng();
 
@@ -64,23 +64,43 @@ pub fn generate_key<const N: usize>(
                 return Err(HapiIronOxideError::PasswordTooShort);
             }
 
-            let salt_string: String = options.salt.unwrap_or_else(|| {
+            let salt_string: String = options.salt.clone().unwrap_or_else(|| {
                 let mut salt: [u8; N] = [0; N];
                 rng.fill_bytes(&mut salt);
                 hex::encode(salt)
             });
 
-            let dk = pbkdf2_hmac_array::<Sha1, 32>(
-                password_string.as_bytes(),
-                salt_string.as_bytes(),
-                options.iterations.try_into().unwrap(),
-            );
+            let dk: Vec<u8> = match options.algorithm {
+                Algorithm::Aes256Cbc | Algorithm::Sha256 => {
+                    let key = pbkdf2_hmac_array::<Sha1, 32>(
+                        password_string.as_bytes(),
+                        salt_string.as_bytes(),
+                        options.iterations.try_into().unwrap(),
+                    );
+
+                    key.to_vec()
+                }
+                Algorithm::Aes128Ctr => {
+                    let key = pbkdf2_hmac_array::<Sha1, 16>(
+                        password_string.as_bytes(),
+                        salt_string.as_bytes(),
+                        options.iterations.try_into().unwrap(),
+                    );
+
+                    key.to_vec()
+                }
+                _what => {
+                    return Err(HapiIronOxideError::InvalidEncryptionAlgorithm(
+                        options.algorithm.name(),
+                    ))
+                }
+            };
 
             Ok(GeneratedKey {
-                key: dk.to_vec(),
+                key: dk,
                 salt: Some(salt_string),
                 iv: match options.iv {
-                    Some(given_iv) => {
+                    Some(ref given_iv) => {
                         iv[..given_iv.len()].copy_from_slice(&given_iv[..]);
                         iv
                     }
@@ -100,7 +120,7 @@ pub fn generate_key<const N: usize>(
                 key: password_vector,
                 salt: None,
                 iv: match options.iv {
-                    Some(given_iv) => {
+                    Some(ref given_iv) => {
                         iv[..given_iv.len()].copy_from_slice(&given_iv[..]);
                         iv
                     }
@@ -119,7 +139,7 @@ pub fn generate_key<const N: usize>(
 /// [`generic_array::typenum::U32`]
 pub fn generate_unseal_key(
     password: Password,
-    options: KeyOptions,
+    options: &KeyOptions,
 ) -> Result<GeneratedKey, HapiIronOxideError> {
     generate_key::<32>(password, options)
 }
@@ -130,36 +150,40 @@ mod tests {
 
     const DECRYPTED_PASSWORD: &'static str =
         "passwordpasswordpasswordpasswordpasswordpasswordpasswordpassword";
+
     const DECRYPTED_MESSAGE: &'static str = "Hello World!";
 
     const AES256CBC_ENCRYPTED_PASSWORD: [u8; 16] = [
         0x87, 0x09, 0x6a, 0xbb, 0xec, 0x0c, 0x53, 0x01, 0x79, 0xd2, 0x74, 0x48, 0xba, 0xdb, 0x55,
         0x5f,
     ];
+
     const AES256CBC_GENERATED_KEY: [u8; 32] = [
         0xf3, 0x23, 0x9f, 0x37, 0x55, 0x29, 0x34, 0xdd, 0xfb, 0xb3, 0x61, 0xbe, 0xa4, 0x7a, 0xab,
         0xc7, 0x6f, 0x62, 0x1e, 0xd2, 0x49, 0x25, 0x0e, 0x1d, 0x9d, 0xf5, 0x38, 0x20, 0x4b, 0xf1,
         0x63, 0x47,
     ];
+
     const AES256CBC_GENERATED_SALT: &'static str =
         "b27a06366ace6bb1560ea039a5595c352a429b87f3982542da9e830a32f5468e";
+
     const AES256CBC_GENERATED_IV: [u8; 16] = [
         0xac, 0xc6, 0x9d, 0x62, 0x8a, 0x2b, 0x0e, 0x54, 0x55, 0x30, 0xd5, 0x82, 0xed, 0xdc, 0x49,
         0x27,
     ];
 
     #[test]
-    fn success_output_key_compares_to_node() {
+    fn test_success_output_key_compares_to_node() {
         let options = KeyOptions {
             algorithm: Algorithm::Aes256Cbc,
             iterations: 2,
             minimum_password_length: 32,
             salt: Some(AES256CBC_GENERATED_SALT.to_string()),
-            iv: Some(AES256CBC_GENERATED_IV.to_vec()),
+            iv: Some(AES256CBC_GENERATED_IV),
         };
 
         let key =
-            generate_key::<32>(Password::String(DECRYPTED_PASSWORD.to_string()), options).unwrap();
+            generate_key::<32>(Password::String(DECRYPTED_PASSWORD.to_string()), &options).unwrap();
 
         assert_eq!(key.salt, Some(AES256CBC_GENERATED_SALT.to_string()));
     }
