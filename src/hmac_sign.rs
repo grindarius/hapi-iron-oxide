@@ -10,7 +10,7 @@ use crate::{
 
 type HmacSha256 = Hmac<Sha256>;
 
-/// Struct storing the HMAC digest and salt from [`hmac_with_password`] function.
+/// Struct storing the HMAC digest and salt.
 pub struct HmacResult {
     /// HMAC digest.
     pub digest: Vec<u8>,

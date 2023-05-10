@@ -151,7 +151,7 @@ mod tests {
     }
 
     #[test]
-    fn test_aes_128_ctr_encrypted() {
+    fn test_aes_128_ctr_encrypt() {
         let options = KeyOptions {
             algorithm: Algorithm::Aes128Ctr,
             iterations: 2,

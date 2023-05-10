@@ -89,11 +89,6 @@ pub fn generate_key<const N: usize>(
 
                     key.to_vec()
                 }
-                _what => {
-                    return Err(HapiIronOxideError::InvalidEncryptionAlgorithm(
-                        options.algorithm.name(),
-                    ))
-                }
             };
 
             Ok(GeneratedKey {
@@ -134,9 +129,8 @@ pub fn generate_key<const N: usize>(
     }
 }
 
-/// Generates key upon call of [`unseal`] function. Since there will always be a salt string that
+/// Generates key. Since there will always be a salt string that
 /// comes in. That means the generic parameter can be of any value. Defaults as
-/// [`generic_array::typenum::U32`]
 pub fn generate_unseal_key(
     password: Password,
     options: &KeyOptions,
@@ -173,7 +167,7 @@ mod tests {
     ];
 
     #[test]
-    fn test_success_output_key_compares_to_node() {
+    fn test_success_key_output() {
         let options = KeyOptions {
             algorithm: Algorithm::Aes256Cbc,
             iterations: 2,

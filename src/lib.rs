@@ -19,6 +19,40 @@
 //! assert_eq!(unsealed.unwrap(), data.to_string());
 //! ```
 //!
+//! The options struct can be customized like This
+//! ```rust
+//! use hapi_iron_oxide::*;
+//! use hapi_iron_oxide::options::EncryptionOptions;
+//! use hapi_iron_oxide::algorithm::Algorithm;
+//!
+//! let password = "passwordpasswordpasswordpasswordpasswordpasswordpasswordpassword";
+//! let data = "Hello World Please";
+//!
+//! let options = SealOptionsBuilder::new().ttl(1000).finish();
+//!
+//! assert_eq!(
+//!     options,
+//!     SealOptions {
+//!         encryption: EncryptionOptions {
+//!             algorithm: Algorithm::Aes256Cbc,
+//!             iterations: 1,
+//!             minimum_password_length: 32,
+//!         },
+//!         integrity: EncryptionOptions {
+//!             algorithm: Algorithm::Sha256,
+//!             iterations: 1,
+//!             minimum_password_length: 32,
+//!         },
+//!         ttl: 1000,
+//!         timestamp_skew: 60,
+//!         local_offset: 0,
+//!     }
+//! );
+//!
+//! let sealed = seal::<32, 32, _>(data.to_string(), password, options).unwrap();
+//! assert!(!sealed.is_empty());
+//! ```
+//!
 //! ### Thank you
 //! Thank you to
 //! - [brc-dd/iron-webcrypto](https://github.com/brc-dd/iron-webcrypto)
@@ -186,7 +220,7 @@ where
 
     let decrypted_value = ENGINE.decode(encryption_value)?;
 
-    let mut iv: [u8; 16] = [0; 16];
+    let mut iv: [u8; IV_SIZE] = [0; IV_SIZE];
     // any invalid length causes a panic
     ENGINE.decode_slice_unchecked(encryption_iv, &mut iv)?;
 

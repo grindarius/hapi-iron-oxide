@@ -1,5 +1,11 @@
 [package]
 name = "hapi-iron-oxide"
+description = "iron-webcrypto and hapi-iron implementation in Rust"
+homepage = "https://github.com/grindarius/hapi-iron-oxide"
+repository = "https://github.com/grindarius/hapi-iron-oxide"
+readme = "README.md"
+documentation = "https://docs.rs/hapi-iron-oxide"
+license = "MIT or APACHE"
 version = "0.1.0"
 edition = "2021"
 

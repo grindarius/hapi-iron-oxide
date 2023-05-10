@@ -1,13 +1,13 @@
 use crate::algorithm::Algorithm;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct EncryptionOptions {
     pub algorithm: Algorithm,
     pub iterations: i32,
     pub minimum_password_length: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct SealOptions {
     pub encryption: EncryptionOptions,
     pub integrity: EncryptionOptions,
