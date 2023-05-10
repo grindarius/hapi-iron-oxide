@@ -4,8 +4,10 @@ description = "iron-webcrypto and hapi-iron implementation in Rust"
 homepage = "https://github.com/grindarius/hapi-iron-oxide"
 repository = "https://github.com/grindarius/hapi-iron-oxide"
 readme = "README.md"
+keywords = ["hapi-iron", "iron-webcrypto", "iron-session", "session"]
+categories = ["web-programming"]
 documentation = "https://docs.rs/hapi-iron-oxide"
-license = "MIT or APACHE"
+license = "MIT or Apache-2.0"
 version = "0.1.0"
 edition = "2021"
 
